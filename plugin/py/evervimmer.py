@@ -8,6 +8,7 @@ import sys
 import traceback
 import threading
 import copy
+import platform
 from evervim_editor import EvervimEditor
 from evervim_editor import EvervimPref
 from xml.dom import minidom
@@ -230,6 +231,8 @@ class Evervimmer(object):
     def createNote(self):  # {{{
         try:
             Evervimmer.currentnote = Evervimmer.editor.api.newNote()
+            if hasattr(self, 'currentNotebook'):
+              Evervimmer.currentnote.notebookGuid = self.currentNotebook.guid
             self.checkNote()
             createdNote = Evervimmer.editor.api.createNote(Evervimmer.currentnote)
             Evervimmer.currentnote = createdNote
@@ -295,13 +298,14 @@ class Evervimmer(object):
 
     def __openClient(self, title):  # {{{ NOTE:this is beta.
         if self.pref.enscriptpath is None:
-            try:
-                import _winreg
-                reg = _winreg.OpenKey(_winreg.HKEY_LOCAL_MACHINE, 'SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\ENScript.exe')
-                self.pref.enscriptpath =  _winreg.EnumValue(reg, 0)[1].encode('shift_jis')
-            except:
-                print '_winreg error!'
-                pass
+            if platform.system() is 'Windows':
+                try:
+                    import _winreg
+                    reg = _winreg.OpenKey(_winreg.HKEY_LOCAL_MACHINE, 'SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\ENScript.exe')
+                    self.pref.enscriptpath =  _winreg.EnumValue(reg, 0)[1].encode('shift_jis')
+                except:
+                    print '_winreg error!'
+                    pass
 
         title_sjis =  unicode(title, 'utf-8', 'ignore').encode('shift_jis')
         subprocess.Popen(self.pref.enscriptpath + " showNotes /q intitle:\"%s\"" % title_sjis)

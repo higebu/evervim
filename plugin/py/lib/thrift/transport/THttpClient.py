@@ -24,6 +24,8 @@ import urlparse
 import httplib
 import warnings
 import socket
+import os
+import platform
 
 class THttpClient(TTransportBase):
 
@@ -59,12 +61,37 @@ class THttpClient(TTransportBase):
     self.__wbuf = StringIO()
     self.__http = None
     self.__timeout = None
+    self.proxy_host = None
+    self.proxy_port = None
+    if platform.system() is 'Windows':
+      from _winreg import *
+      import _winreg as winreg
+      key = winreg.OpenKey(HKEY_CURRENT_USER, r'Software\Microsoft\Windows\CurrentVersion\Internet Settings', 0, KEY_READ)
+      if winreg.QueryValueEx(key, 'ProxyEnable')[0] is 1:
+        proxy = winreg.QueryValueEx(key, "ProxyServer")[0]
+        self.proxy_host = proxy.split(':')[0]
+        self.proxy_port = proxy.split(':')[1]
+      winreg.CloseKey(key)
+    else:
+      http_proxy = os.environ.get('http_proxy')
+      if http_proxy is not None:
+        parsed = urlparse.urlparse(http_proxy)
+        self.proxy_host = parsed.hostname
+        self.proxy_port = parsed.port
 
   def open(self):
-    if self.scheme == 'http':
-      self.__http = httplib.HTTP(self.host, self.port)
+    if self.scheme is 'http':
+      if self.proxy_host is not None:
+        self.__http = httplib.HTTP(self.proxy_host, str(self.proxy_port))
+        self.__http._conn.set_tunnel(self.host, self.port)
+      else:
+        self.__http = httplib.HTTP(self.host, self.port)
     else:
-      self.__http = httplib.HTTPS(self.host, self.port)
+      if self.proxy_host is not None:
+        self.__http = httplib.HTTPS(self.proxy_host, str(self.proxy_port))
+        self.__http._conn.set_tunnel(self.host, self.port)
+      else:
+        self.__http = httplib.HTTPS(self.host, self.port)
 
   def close(self):
     self.__http.close()
